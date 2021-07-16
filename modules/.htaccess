@@ -1,0 +1,3 @@
+ # Add the WASM MIME type
+ AddType application/wasm			.wasm
+ 

@@ -1,0 +1,31 @@
+.pic-frame {
+	width: 1024px;
+}
+
+.progan-pic img {
+	width:1024px; 
+	height:1024px; 
+	display:none;
+}
+
+.container {
+	float: right; 
+	width: 200px;
+}
+
+.status {
+	float: right; 
+	display: inline;
+}
+.status span {
+	color: red;
+	padding-right: 5px;
+}
+.status td {
+	vertical-align: top;
+}
+.status-report {
+	width: 150px;
+	height: 100px;
+	border: inset 2px;
+}

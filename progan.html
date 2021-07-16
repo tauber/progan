@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<link rel="stylesheet" type="text/css" href="style/main.css">
+	<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs/dist/tf.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm/dist/tf-backend-wasm.js"></script>  
+	<script type="module" src="modules/progan.js"></script>
+</head>
+
+<body>
+	<div class="status">
+		<table>
+			<tr><td>
+			<span class="time-report">The average run time is <span id="avg-run"></span> seconds per thread.</span>
+			</td></tr>
+			<tr class="proto-tr"><td>
+			<span>Thread-1 Status:</span></td>
+			<td><div class="status-report" id="status-report-1">
+			</div></td></tr>
+		</table>
+	</div>
+	<div class="container">
+		<canvas class="dial" width="2px" height="2px">
+		</canvas>
+		<div>
+			<input type="range" id="dialer" name="dialer" class="dialer" min="0" max="99" list="tickmarks">
+			<label for="dialer">encodings</label>
+			<datalist id="tickmarks">
+				<option value="0" label="0%"></option>
+				<option value="10"></option>
+				<option value="20"></option>
+				<option value="30"></option>
+				<option value="40"></option>
+				<option value="50"></option>
+				<option value="60"></option>
+				<option value="70"></option>
+				<option value="80"></option>
+				<option value="90"></option>
+				<option value="100" label="100%"></option>
+			</datalist>
+		</div>
+	</div>
+	<div class="pic-frame">
+		<div>This page showcases the original Progresssive Gan network at full resolution (1024x1024). <br>
+		The download size is 100MB and it can take a while... Refresh for different pictures.<br>
+		<br>
+		</div>
+
+		<label for="threads">Choose the number of threads (reload the page to change):</label>
+
+		<select name="threads" id="threads" autocomplete="off">
+			<option value="" selected disabled hidden>Choose one</option>
+			<option value="0">1 thread</option>
+			<option value="1">2 threads</option>
+			<option value="2">3 threads</option>
+			<option value="3">4 threads</option>
+		</select>
+<br/>
+		<label for="backend">Choose a tensorflow backend:</label>
+
+		<select name="backend" id="backend" autocomplete="off">
+			<option value="" selected disabled hidden>Choose one</option>
+			<option value="webgl">WebGL (GPU - generally fastest)</option>
+			<option value="wasm">WASM (compiled cpu)</option>
+			<option value="cpu">CPU (Vanilla Javascript)</option>
+		</select>
+		<div class="progan-pic">
+			<span class="progress-report"></span>
+			<img src="images/progan-default.png">
+			<canvas class="output_img" width="1024px" height="1024px">
+			</canvas>
+		</div>
+	</div>
+</body>
+</html>
