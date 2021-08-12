@@ -4,6 +4,10 @@
 importScripts("https://cdn.jsdelivr.net/npm/@tensorflow/tfjs/dist/tf.min.js");
 importScripts("https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm/dist/tf-backend-wasm.js");
 
+tf.wasm.setWasmPaths(
+    'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm/dist/'
+);
+
 // Run the neural network if it had finished processing the last latent, otherwise store it,
 // and run it recursively. Do not use return value due to recursion.
 var progan_promise_ready = true;
@@ -36,92 +40,104 @@ function generateImageData(img)
 
 onmessage = async function render_gan_image(msg)
 {
-	if(msg.data.thread) 
-	{
-		postMsg.thread = msg.data.thread;
-		postMsg.status = "Progan network starting...";
-		postMessage(postMsg);
-	}
-		
-	if(msg.data.canvas)
-	{
-		offscreen_canvas = new OffscreenCanvas(msg.data.canvas.width, msg.data.canvas.height);
-		postMsg.status = "Canvas set to " + offscreen_canvas;
-		postMessage(postMsg);
+	try {
+		if(msg.data.thread) 
+		{
+			postMsg.thread = msg.data.thread;
+			postMsg.status = "Progan network starting...";
+			postMessage(postMsg);
+		}
+			
+		if(msg.data.canvas)
+		{
+			offscreen_canvas = new OffscreenCanvas(msg.data.canvas.width, msg.data.canvas.height);
+			postMsg.status = "Canvas set to " + offscreen_canvas;
+			postMessage(postMsg);
 
+			return true;
+		}
+		
+		if(!progan_promise_ready)
+		{
+			postMsg.status = "This latent will be executed when the network is ready";
+			postMessage(postMsg);
+			return false;
+		}
+
+		
+		let winLoc = self.location.pathname;
+		const MODEL_URL = winLoc.slice(0, winLoc.lastIndexOf('modules'))+'weights/model.json';
+
+		if(backend != msg.data.backend)
+		{
+			backend = msg.data.backend;
+			if(backend == "wasm")
+			{
+				tf.env().set('WASM_HAS_MULTITHREAD_SUPPORT', false);
+	//			tf.env().set('WASM_HAS_SIMD_SUPPORT', false);
+			}
+			postMsg.status = "Setting backend to " + backend;
+			postMessage(postMsg);
+			await tf.setBackend(backend);
+			postMsg.status = "Downloading network model (refreshing the browser for new faces will use cache)...";
+			postMessage(postMsg);
+			model = await tf.loadGraphModel(MODEL_URL);
+		}	
+		
+		let latents = msg.data.latents;
+		progan_promise_ready = false;
+		
+		postMsg.status = "Starting inference now...";
+		postMessage(postMsg);
+		let t_start = performance.now();
+		progan_img = await model.executeAsync([tf.tensor([[]]), tf.tensor([latents])]);
+		let t_end = performance.now();
+
+		postMsg.time = (t_end-t_start)/1000.0;
+		postMsg.status = "The inference time with backend " + tf.getBackend() + " is: " + postMsg.time + " seconds.";
+		postMessage(postMsg);
+		// reset the time for the other messages.
+		postMsg.time = 0;
+
+		img = tf.tidy(() => {
+			let transpose_data = progan_img.transpose([0, 2, 3, 1]);
+			
+			let img_data = transpose_data.add(tf.scalar(1)).mul(tf.scalar(127.5)).clipByValue(0,255).squeeze();
+		//	img = img_from_tensor[0].map(x => x.map(y => y.map(z => Math.min(Math.max(Math.round((z+1)/2*255), 0), 255))));
+
+			return img_data; 
+		});
+		
+		img = img.arraySync();
+		imgBitmap = new ImageData(generateImageData(img), img.length);
+				
+		progan_promise_ready = true;
+
+		postMessage({gan_img: imgBitmap, latents: latents, thread: postMsg.thread});
+		
+	/*	
+		if(!offscreen_canvas)
+		{
+			postMessage({status: "Please set the offscreen canvas dimentions first..."});
+		}
+
+		tf.browser.toPixels(img, offscreen_canvas).then(() => {
+			console.log(img);
+			imgBitmap = offscreen_canvas.transferToImageBitmap();
+			addToImageCache(imgBitmap, latents);
+			postMessage({gan_bitmap: imgBitmap });
+			if(latest_latent)
+				render_gan_image(latest_latent);
+		});
+
+	*/
 		return true;
 	}
-	
-	if(!progan_promise_ready)
+	catch(e)
 	{
-		postMsg.status = "This latent will be executed when the network is ready";
+		postMsg.status = "Error in execution: " + e.message;
 		postMessage(postMsg);
+
 		return false;
 	}
-
-	const MODEL_URL = '/progan/weights/model.json';
-	if(backend != msg.data.backend)
-	{
-		backend = msg.data.backend;
-		if(backend == "wasm")
-		{
-			tf.env().set('WASM_HAS_MULTITHREAD_SUPPORT', false);
-//			tf.env().set('WASM_HAS_SIMD_SUPPORT', false);
-		}
-		postMsg.status = "Setting backend to " + backend;
-		postMessage(postMsg);
-		await tf.setBackend(backend);
-		postMsg.status = "Downloading network model (refreshing the browser for new faces will use cache)...";
-		postMessage(postMsg);
-		model = await tf.loadGraphModel(MODEL_URL);
-	}	
-	
-	let latents = msg.data.latents;
-	progan_promise_ready = false;
-	
-	postMsg.status = "Starting inference now...";
-	postMessage(postMsg);
-	let t_start = performance.now();
-	progan_img = await model.executeAsync([tf.tensor([[]]), tf.tensor([latents])]);
-	let t_end = performance.now();
-
-	postMsg.time = (t_end-t_start)/1000.0;
-	postMsg.status = "The inference time with backend " + tf.getBackend() + " is: " + postMsg.time + " seconds.";
-	postMessage(postMsg);
-	// reset the time for the other messages.
-	postMsg.time = 0;
-
-	img = tf.tidy(() => {
-		let transpose_data = progan_img.transpose([0, 2, 3, 1]);
-		
-		let img_data = transpose_data.add(tf.scalar(1)).mul(tf.scalar(127.5)).clipByValue(0,255).squeeze();
-	//	img = img_from_tensor[0].map(x => x.map(y => y.map(z => Math.min(Math.max(Math.round((z+1)/2*255), 0), 255))));
-
-		return img_data; 
-	});
-	
-	img = img.arraySync();
-	imgBitmap = new ImageData(generateImageData(img), img.length);
-			
-	progan_promise_ready = true;
-
-	postMessage({gan_img: imgBitmap, latents: latents, thread: postMsg.thread});
-	
-/*	
-	if(!offscreen_canvas)
-	{
-		postMessage({status: "Please set the offscreen canvas dimentions first..."});
-	}
-
-	tf.browser.toPixels(img, offscreen_canvas).then(() => {
-		console.log(img);
-		imgBitmap = offscreen_canvas.transferToImageBitmap();
-		addToImageCache(imgBitmap, latents);
-		postMessage({gan_bitmap: imgBitmap });
-		if(latest_latent)
-			render_gan_image(latest_latent);
-	});
-
-*/
-	return true;
 }
